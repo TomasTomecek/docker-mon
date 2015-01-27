@@ -42,7 +42,7 @@ var parse = function (func){
     });
 };
 
-var fetchContainerDetails = function (containerID, detailBox) {
+var fetchContainerDetails = function (containerID, detailBox, log) {
     request({
         json: true,
         method: 'GET',
@@ -61,6 +61,25 @@ var fetchContainerDetails = function (containerID, detailBox) {
         detailBox.setText(JSON.stringify(body, undefined, 2))
         screen.render()
     })
+    request({
+        //json: true,
+        method: 'GET',
+        uri: host + '/containers/' + containerID + '/logs?stdout=0&stderr=1&tail=all'
+    }, function(err, resp, body) {
+        if (err) {
+            return log.setText("Error fetching container info: " + err)
+        }
+
+        if (resp.statusCode != 200) {
+            return log.setText("Error fetch container info (" + resp.statusCode + "), error: " + body)
+        }
+        var logs = body.split("\n");
+        for(var i=0; i<logs.length; i++) {
+            log.log(logs[i]);
+        }
+        screen.render()
+    })
+
 }
 
 // Get the containers
@@ -94,7 +113,7 @@ parse(function (containers) {
         }
     })
 
-    var bottomGrid = new contrib.grid({rows: 1, cols: 2})
+    /*var bottomGrid = new contrib.grid({rows: 1, cols: 2})
     bottomGrid.set(0, 0, contrib.line, {
         label: "CPU %",
         maxY: 100,
@@ -105,7 +124,14 @@ parse(function (containers) {
             line: "yellow",
             text: "white"
         }
-    })
+    });*/
+
+    var bottomGrid = new contrib.grid({rows: 1, cols: 2});
+    bottomGrid.set(0, 0, contrib.log, {
+        fg: "white",
+        selectedFg: "white",
+        label: "Log",
+    });
 
     var gaugesGrid = new contrib.grid({rows: 1, cols: 2})
     gaugesGrid.set(0, 0, contrib.gauge, {
@@ -142,7 +168,7 @@ parse(function (containers) {
     globalGrid.applyLayout(screen);
 
     // Name widgets
-    var cpuLine = bottomGrid.get(0, 0)
+    var cpuLine = bottomGrid.get(0, 0);
     var cpuGauge = gaugesGrid.get(0, 0)
     var memGauge = gaugesGrid.get(0, 1)
     var networkBox = bottomRightGrid.get(1, 0)
@@ -151,7 +177,7 @@ parse(function (containers) {
     cpuGauge.border.style.fg = borderColor
     memGauge.border.style.fg = borderColor
     networkBox.border.style.fg = borderColor
-    cpuLine.canvasSize.width -= 12 // workaround to avoid overflowing the X labels
+    //cpuLine.canvasSize.width -= 12 // workaround to avoid overflowing the X labels
 
     // Create container detail view
     var containerDetailBox = upperGrid.get(0, 1)
@@ -168,11 +194,11 @@ parse(function (containers) {
     containersTable.rows.on("select", function (item) {
         // Get container data, update detail view
         var containerData = containers[containersTable.rows.getItemIndex(item)]
-        fetchContainerDetails(containerData.Id, containerDetailBox)
+        fetchContainerDetails(containerData.Id, containerDetailBox, cpuLine)
 
         // Clear graphs and start collecting container stats
         var elements = [
-            new widgets.CPUPercentageLine(cpuLine),
+            //new widgets.CPUPercentageLine(cpuLine),
             new widgets.CPUGauge(cpuGauge),
             new widgets.MEMGauge(memGauge),
             new widgets.NetworkIO(networkBox)
